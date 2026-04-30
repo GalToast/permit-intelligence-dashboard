@@ -1,0 +1,11 @@
+.env
+.env.*
+__pycache__/
+.pytest_cache/
+.venv/
+*.csv
+*.log
+all_permits.json
+filtered_opportunities.json
+filtered_opportunities.csv
+dashboard.html

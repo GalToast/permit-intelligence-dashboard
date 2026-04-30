@@ -1,0 +1,42 @@
+[
+  {
+    "permit_number": "B-26-1001",
+    "permit_type": "Commercial Building",
+    "project_type": "New Construction",
+    "location": "100 SAMPLE INDUSTRIAL RD CONROE, TX 77301",
+    "status": "Pending",
+    "estimated_cost": "$425,000",
+    "estimated_cost_numeric": 425000,
+    "contractor_company": "Example Commercial Builders",
+    "contractor_name": "Sample Contact",
+    "is_commercial": true,
+    "has_contractor_info": true,
+    "opportunity_score": 90
+  },
+  {
+    "permit_number": "B-26-1002",
+    "permit_type": "Residential Building",
+    "project_type": "Addition",
+    "location": "200 DEMO OAK LN CONROE, TX 77304",
+    "status": "Approved",
+    "estimated_cost": "$85,000",
+    "estimated_cost_numeric": 85000,
+    "contractor_company": "Demo Residential Group",
+    "is_commercial": false,
+    "has_contractor_info": true,
+    "opportunity_score": 40
+  },
+  {
+    "permit_number": "B-26-1003",
+    "permit_type": "Commercial Alteration",
+    "project_type": "Tenant Improvement",
+    "location": "300 PUBLIC RECORDS BLVD CONROE, TX 77302",
+    "status": "In Progress",
+    "estimated_cost": "$190,000",
+    "estimated_cost_numeric": 190000,
+    "contractor_company": "Sample Interiors LLC",
+    "is_commercial": true,
+    "has_contractor_info": true,
+    "opportunity_score": 80
+  }
+]
