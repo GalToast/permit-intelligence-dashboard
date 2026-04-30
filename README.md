@@ -4,6 +4,8 @@ Public-record data pipeline for turning building permits into reviewable busines
 
 This project is a sanitized portfolio version of a local permit-intelligence workflow. It combines public permit search, parcel enrichment, scoring, CSV/JSON exports, and a static dashboard concept for operator review. The point is not spam automation. The point is practical data work: collect public records, enrich them, score them, and give a human a clean review surface.
 
+![Permit dashboard generated from sample data](docs/assets/permit-dashboard.png)
+
 ## What It Demonstrates
 
 - Browser automation against public permit portals
@@ -35,6 +37,16 @@ public permit portal
 | `src/dashboard.py` | Static HTML dashboard generator |
 | `examples/sample_permits.json` | Synthetic sample data for local dashboard testing |
 | `docs/portfolio-case-study.md` | Recruiter-facing explanation of the project |
+| `docs/assets/permit-dashboard.png` | Screenshot of the generated static dashboard using sample data |
+
+## Proof Artifacts
+
+| Artifact | What it shows |
+| --- | --- |
+| `dashboard.html` | Generated static review surface |
+| `examples/sample_permits.json` | Synthetic sample input for safe demo generation |
+| `docs/portfolio-case-study.md` | Portfolio framing and implementation narrative |
+| `tests/` | Deterministic parsing, scoring, and export checks |
 
 ## Quick Start
 
