@@ -57,11 +57,25 @@ Run the public-record pipeline:
 python src/pipeline.py --max-permits 10 --min-cost 50000 --headless
 ```
 
+Write JSON, CSV, and a static dashboard in one pass:
+
+```bash
+python src/pipeline.py --max-permits 10 --min-cost 50000 --headless --dashboard dashboard.html
+```
+
+Run focused tests:
+
+```bash
+python -m unittest discover -s tests
+```
+
 ## Configuration
 
 The default implementation targets the City of Conroe public OpenGov and ArcGIS endpoints because those were the original research surface. The code is intentionally written so another OpenGov-style city portal can be substituted with a different base URL.
 
 No API keys are required for the included public endpoints.
+
+Live scraping is portal-layout dependent. The deterministic parts of the repo, including money parsing, address extraction, scoring, export, and dashboard rendering, are covered by focused tests.
 
 ## Ethics
 

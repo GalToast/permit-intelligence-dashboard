@@ -32,11 +32,12 @@ class PublicParcelClient:
 
     def query_by_address(self, address: str) -> dict[str, Any] | None:
         """Return the first parcel match for a street address."""
-        if not address.strip():
+        cleaned_address = sanitize_arcgis_literal(address)
+        if not cleaned_address:
             return None
 
         params = {
-            "where": f"situs LIKE '%{address.upper()}%'",
+            "where": f"situs LIKE '%{cleaned_address.upper()}%'",
             "outFields": "*",
             "returnGeometry": "false",
             "f": "json",
@@ -82,3 +83,8 @@ class PublicParcelClient:
             "acreage": attributes.get("acreage", ""),
             "subdivision": attributes.get("subdivision", ""),
         }
+
+
+def sanitize_arcgis_literal(value: str) -> str:
+    """Sanitize text used inside a simple ArcGIS SQL LIKE literal."""
+    return value.strip().replace("'", "''")

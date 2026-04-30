@@ -40,5 +40,9 @@ The public repo uses synthetic sample data. The production pattern should keep r
 - Add city-portal adapters with explicit capability flags.
 - Add a dedupe layer across repeated daily runs.
 - Add a review status field for human outcomes.
-- Add tests around money parsing, address extraction, and scoring.
 - Add optional LLM summarization only after deterministic fields are extracted.
+
+## Verification Added
+
+- Focused tests cover money parsing, address extraction, opportunity scoring, dashboard generation, and ArcGIS literal escaping.
+- The pipeline can now optionally write JSON, CSV, and a static dashboard from one command.

@@ -8,8 +8,10 @@ import csv
 import json
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
+from dashboard import render_dashboard
 from parcel_client import PublicParcelClient
 from permit_scraper import OpenGovPermitScraper
 
@@ -103,7 +105,8 @@ class PermitIntelligencePipeline:
 
 
 def extract_street_address(location: str) -> str:
-    return re.sub(r"\s+[A-Z ]+,\s*[A-Z]{2}\s+\d{5}.*$", "", location, flags=re.IGNORECASE).strip()
+    without_state_zip = re.sub(r",\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?.*$", "", location, flags=re.IGNORECASE)
+    return re.sub(r"\s+CONROE$", "", without_state_zip, flags=re.IGNORECASE).strip()
 
 
 def parse_money(value: Any) -> float:
@@ -113,16 +116,24 @@ def parse_money(value: Any) -> float:
         return 0.0
 
 
-def write_outputs(records: list[dict[str, Any]]) -> None:
-    with open("filtered_opportunities.json", "w", encoding="utf-8") as handle:
+def write_outputs(
+    records: list[dict[str, Any]],
+    json_path: str = "filtered_opportunities.json",
+    csv_path: str = "filtered_opportunities.csv",
+    dashboard_path: str | None = None,
+) -> None:
+    with open(json_path, "w", encoding="utf-8") as handle:
         json.dump(records, handle, indent=2)
 
     if records:
         keys = sorted({key for record in records for key in record if key != "parcel_data"})
-        with open("filtered_opportunities.csv", "w", newline="", encoding="utf-8") as handle:
+        with open(csv_path, "w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=keys)
             writer.writeheader()
             writer.writerows({key: record.get(key, "") for key in keys} for record in records)
+
+    if dashboard_path:
+        Path(dashboard_path).write_text(render_dashboard(records), encoding="utf-8")
 
 
 async def async_main() -> None:
@@ -131,6 +142,7 @@ async def async_main() -> None:
     parser.add_argument("--max-permits", type=int, default=25)
     parser.add_argument("--min-cost", type=float, default=50000)
     parser.add_argument("--headless", action="store_true")
+    parser.add_argument("--dashboard", default="", help="Optional path for generated static dashboard HTML")
     args = parser.parse_args()
 
     pipeline = PermitIntelligencePipeline(
@@ -139,7 +151,7 @@ async def async_main() -> None:
         headless=args.headless,
     )
     records = await pipeline.run(max_permits=args.max_permits)
-    write_outputs(records)
+    write_outputs(records, dashboard_path=args.dashboard or None)
     print(f"Exported {len(records)} scored opportunities")
 
 
