@@ -43,7 +43,7 @@ public permit portal
 
 | Artifact | What it shows |
 | --- | --- |
-| `dashboard.html` | Generated static review surface |
+| `src/dashboard.py` | Static review-surface generator; run the quick start below to create `dashboard.html` locally |
 | `examples/sample_permits.json` | Synthetic sample input for safe demo generation |
 | `docs/portfolio-case-study.md` | Portfolio framing and implementation narrative |
 | `tests/` | Deterministic parsing, scoring, and export checks |
