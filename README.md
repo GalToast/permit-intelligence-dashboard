@@ -89,6 +89,10 @@ No API keys are required for the included public endpoints.
 
 Live scraping is portal-layout dependent. The deterministic parts of the repo, including money parsing, address extraction, scoring, export, and dashboard rendering, are covered by focused tests.
 
+## Data Provenance
+
+The public repo uses synthetic sample data for the bundled dashboard demo. Live runs are intended for public permit and parcel records from open government portals, with rate limits and portal terms respected. Raw exports and opportunity lists should be treated as private review artifacts unless there is a clear legal and ethical reason to publish them.
+
 ## Ethics
 
 Use this kind of workflow carefully:
