@@ -14,9 +14,50 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(parse_money("75000"), 75000)
         self.assertEqual(parse_money(""), 0)
         self.assertEqual(parse_money("not listed"), 0)
+        self.assertEqual(parse_money(None), 0)
+        self.assertEqual(parse_money("$1,234.56"), 1234.56)
 
     def test_extract_street_address_removes_city_state_zip(self):
         self.assertEqual(extract_street_address("100 SAMPLE RD CONROE, TX 77301"), "100 SAMPLE RD")
+
+    def test_extract_street_address_accepts_substituted_city(self):
+        self.assertEqual(
+            extract_street_address("500 ELM AVE SPRINGFIELD, TX 75001", city="SPRINGFIELD"),
+            "500 ELM AVE",
+        )
+        self.assertEqual(
+            extract_street_address("500 ELM AVE, SPRINGFIELD, TX 75001"),
+            "500 ELM AVE",
+        )
+
+    def test_extract_street_address_handles_empty_and_zip_plus_four(self):
+        self.assertEqual(extract_street_address(""), "")
+        self.assertEqual(extract_street_address("9 OAK ST CONROE, TX 77301-1234"), "9 OAK ST")
+
+    def test_scoring_survives_malformed_cost(self):
+        pipeline = PermitIntelligencePipeline(min_cost=50000)
+        scored = pipeline._score(
+            {
+                "permit_type": "Commercial Building",
+                "project_type": "New Construction",
+                "status": "Pending",
+                "estimated_cost": "not listed",
+            }
+        )
+        self.assertEqual(scored["estimated_cost_numeric"], 0)
+        self.assertEqual(scored["opportunity_score"], 45)  # commercial 25 + pending 20
+
+    def test_pipeline_threads_custom_city_into_enrichment(self):
+        pipeline = PermitIntelligencePipeline(city="SPRINGFIELD")
+        seen = {}
+
+        def fake_query(address):
+            seen["address"] = address
+            return None
+
+        pipeline.parcels.query_by_address = fake_query
+        pipeline._enrich({"location": "500 ELM AVE SPRINGFIELD, TX 75001"})
+        self.assertEqual(seen["address"], "500 ELM AVE")
 
     def test_scoring_rewards_commercial_value_status_and_contact(self):
         pipeline = PermitIntelligencePipeline(min_cost=50000)
