@@ -1,7 +1,22 @@
 """Public ArcGIS parcel lookup client.
 
-The default endpoint targets public City of Conroe parcel data. No API key is
-required for the included endpoint.
+The default endpoint targets public City of Conroe parcel/address data. No API
+key is required for the included endpoint.
+
+Data-source status (verified 2026-09-30 via live REST queries):
+- MapServer layer 2 (``Conroe_Parcels``, the polygon parcel layer) publishes
+  43,348 features but ships every attribute field (PIN, pid, situs, ownerName,
+  ownerAddress, imprvActualYearBuilt, imprvMainArea, legalDescription, ...)
+  blank or zero. Address matching against it silently returns nothing, so it
+  is NOT used as the default enrichment source.
+- MapServer layer 1 (``Conroe_Address_Point_Public_View``) is populated with
+  47,905 address points and is the default enrichment source. Queries match on
+  the ``ADDRESS`` field, and parcel-side attributes come back under truncated
+  10-character field names (e.g. ``ownerAddre``, ``imprvActua``).
+
+The field mapping below accepts both the truncated layer-1 names and the full
+layer-2 names, so the client keeps working if the polygon layer is repopulated
+in the future (set ``parcel_layer=2`` in that case).
 """
 
 from __future__ import annotations
@@ -19,7 +34,7 @@ class PublicParcelClient:
         self,
         base_url: str = "https://maps.cityofconroe.org/cvharcgis/rest/services",
         map_service: str = "Building_Inspections_and_Permits/MapServer",
-        parcel_layer: int = 2,
+        parcel_layer: int = 1,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.map_service = map_service.strip("/")
@@ -36,8 +51,12 @@ class PublicParcelClient:
         if not cleaned_address:
             return None
 
+        # The address-points layer matches on ADDRESS; the legacy polygon
+        # layer matches on situs. ADDRESS exists only on layer 1, so for the
+        # default layer we always query ADDRESS.
+        match_field = "ADDRESS" if self.parcel_layer == 1 else "situs"
         params = {
-            "where": f"situs LIKE '%{cleaned_address.upper()}%'",
+            "where": f"{match_field} LIKE '%{cleaned_address.upper()}%'",
             "outFields": "*",
             "returnGeometry": "false",
             "f": "json",
@@ -71,17 +90,38 @@ class PublicParcelClient:
 
     @staticmethod
     def _format_parcel(attributes: dict[str, Any]) -> dict[str, Any]:
+        """Map raw ArcGIS attributes to a stable parcel record.
+
+        Accepts both the layer-1 address-points schema (truncated 10-character
+        field names) and the layer-2 polygon schema (full field names). Fields
+        that exist on neither layer (land/improvement/total value, acreage)
+        are no longer returned; they were previously mapped from field names
+        that do not exist on the live layers.
+        """
+
+        def pick(*names: str) -> Any:
+            for name in names:
+                value = attributes.get(name)
+                if value not in (None, "", " "):
+                    return value
+            return ""
+
         return {
-            "parcel_id": attributes.get("PARCELID", ""),
-            "situs_address": attributes.get("situs", ""),
-            "owner_name": attributes.get("ownerName", ""),
-            "improvement_area": attributes.get("imprvMainArea", ""),
-            "land_value": attributes.get("landValue", ""),
-            "improvement_value": attributes.get("imprvValue", ""),
-            "total_value": attributes.get("totalValue", ""),
-            "year_built": attributes.get("yearBuilt", ""),
-            "acreage": attributes.get("acreage", ""),
-            "subdivision": attributes.get("subdivision", ""),
+            "parcel_id": pick("PIN", "pid"),
+            "situs_address": pick("ADDRESS", "situs"),
+            "owner_name": pick("ownerName", ""),
+            "owner_address": pick("ownerAddre", "ownerAddress"),
+            "improvement_area": pick("imprvMainA", "imprvMainArea"),
+            "year_built": pick("imprvActua", "imprvActualYearBuilt"),
+            "subdivision": pick("SUB_NAME", ""),
+            "legal_description": pick("legalDescr", "legalDescription"),
+            "lot": pick("lot_1", "Lot"),
+            "block": pick("block_1", "Block"),
+            "tract": pick("tract_1", "Tract"),
+            "city": pick("CITY", ""),
+            "state": pick("ST", ""),
+            "zip": pick("ZIPCODE", ""),
+            "county": pick("COUNTY", ""),
         }
 
 
