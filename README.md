@@ -1,5 +1,7 @@
 # Permit Intelligence Dashboard
 
+[![Tests](https://github.com/GalToast/permit-intelligence-dashboard/actions/workflows/tests.yml/badge.svg)](https://github.com/GalToast/permit-intelligence-dashboard/actions/workflows/tests.yml)
+
 Public-record data pipeline for turning building permits into reviewable business opportunities.
 
 This project is a sanitized portfolio version of a local permit-intelligence workflow. It combines public permit search, parcel enrichment, scoring, CSV/JSON exports, and a static dashboard concept for operator review. The point is not spam automation. The point is practical data work: collect public records, enrich them, score them, and give a human a clean review surface.
@@ -50,11 +52,18 @@ public permit portal
 
 ## Quick Start
 
+### Dashboard-only demo (no browser needed)
+
+This path uses only the synthetic sample data. It does **not** require Playwright's
+browser download (`playwright install chromium`), just the Python packages.
+
 ```bash
 python -m venv .venv
+# Windows:
 .venv\Scripts\activate
+# macOS / Linux:
+source .venv/bin/activate
 pip install -r requirements.txt
-playwright install chromium
 ```
 
 Generate a dashboard from the synthetic sample:
@@ -63,9 +72,20 @@ Generate a dashboard from the synthetic sample:
 python src/dashboard.py --input examples/sample_permits.json --output dashboard.html
 ```
 
-Run the public-record pipeline:
+Run focused tests:
 
 ```bash
+python -m unittest discover -s tests
+```
+
+### Optional: live public-record pipeline
+
+The live pipeline drives a real browser against the public OpenGov portal and
+queries the public ArcGIS enrichment layer. It requires the Chromium download
+and takes longer:
+
+```bash
+playwright install chromium
 python src/pipeline.py --max-permits 10 --min-cost 50000 --headless
 ```
 
@@ -75,11 +95,28 @@ Write JSON, CSV, and a static dashboard in one pass:
 python src/pipeline.py --max-permits 10 --min-cost 50000 --headless --dashboard dashboard.html
 ```
 
-Run focused tests:
+Targeting a different city portal is supported:
 
 ```bash
-python -m unittest discover -s tests
+python src/pipeline.py --portal https://othertown.portal.opengov.com --city OTHERTOWN --max-permits 10
 ```
+
+## Parcel Enrichment Data Source
+
+Parcel enrichment uses the public City of Conroe ArcGIS REST service
+(`src/parcel_client.py`, `PublicParcelClient`). Verified 2026-09-30:
+
+- The polygon parcel layer (`Conroe_Parcels`, MapServer layer 2) publishes
+  43,348 features but serves every attribute field (situs, ownerName, values,
+  year built, ...) blank or zero. Address matching against it silently returns
+  nothing, so it is **not** used by default.
+- The default source is the populated address-points layer
+  (`Conroe_Address_Point_Public_View`, MapServer layer 1, 47,905 features),
+  matched on its `ADDRESS` field. Returned enrichment includes owner, year
+  built, improvement area, subdivision, and legal description.
+- To point the client at a different layer (e.g. if layer 2 is repopulated),
+  pass `parcel_layer=<id>` to `PublicParcelClient`. The field mapping accepts
+  both layers' field-name schemas.
 
 ## Configuration
 
