@@ -17,8 +17,29 @@ def score_label(score: int) -> str:
     return "Low"
 
 
+def to_float(value: Any) -> float:
+    """Coerce a value to float, returning 0.0 for malformed input.
+
+    Records may carry estimated_cost_numeric as strings (e.g. "$12,000" from
+    a hand-edited JSON file) or placeholder text like "not listed". Never let
+    those crash dashboard generation.
+    """
+    try:
+        return float(str(value).replace("$", "").replace(",", "").strip() or 0)
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def to_int(value: Any) -> int:
+    """Coerce a value to int, returning 0 for malformed input."""
+    try:
+        return int(float(str(value).replace("$", "").replace(",", "").strip() or 0))
+    except (ValueError, TypeError):
+        return 0
+
+
 def render_dashboard(records: list[dict[str, Any]]) -> str:
-    total_value = sum(float(record.get("estimated_cost_numeric") or 0) for record in records)
+    total_value = sum(to_float(record.get("estimated_cost_numeric")) for record in records)
     commercial = sum(1 for record in records if record.get("is_commercial"))
     with_contact = sum(1 for record in records if record.get("contractor_phone") or record.get("contractor_email"))
 
@@ -80,9 +101,9 @@ def render_dashboard(records: list[dict[str, Any]]) -> str:
 
 
 def render_row(record: dict[str, Any]) -> str:
-    score = int(record.get("opportunity_score") or 0)
+    score = to_int(record.get("opportunity_score"))
     label = score_label(score)
-    cost = float(record.get("estimated_cost_numeric") or 0)
+    cost = to_float(record.get("estimated_cost_numeric"))
     contractor = record.get("contractor_company") or record.get("contractor_name") or "Not listed"
     return f"""<tr>
   <td class="score {label}">{score}<br>{label}</td>

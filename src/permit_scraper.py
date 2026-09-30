@@ -10,9 +10,20 @@ from typing import Any
 
 from playwright.async_api import Browser, Page, async_playwright
 
+NAVIGATION_TIMEOUT_MS = 30_000
+ELEMENT_TIMEOUT_MS = 15_000
+NAVIGATION_RETRIES = 3
+
 
 class OpenGovPermitScraper:
-    """Scrape public permit records from an OpenGov search portal."""
+    """Scrape public permit records from an OpenGov search portal.
+
+    The locator strategy (role-based and ``text=`` substring selectors) is
+    portal-layout dependent: it will need updating if the target portal
+    redesigns its search/results markup. Navigation has bounded timeouts and
+    retries; per-page failures are isolated so one broken page does not abort
+    the run.
+    """
 
     def __init__(self, base_url: str = "https://conroetx.portal.opengov.com", headless: bool = True):
         self.base_url = base_url.rstrip("/")
@@ -26,6 +37,8 @@ class OpenGovPermitScraper:
         self.playwright = await async_playwright().start()
         self.browser = await self.playwright.chromium.launch(headless=self.headless)
         self.page = await self.browser.new_page()
+        self.page.set_default_navigation_timeout(NAVIGATION_TIMEOUT_MS)
+        self.page.set_default_timeout(ELEMENT_TIMEOUT_MS)
 
     async def close(self) -> None:
         if self.browser:
@@ -33,12 +46,28 @@ class OpenGovPermitScraper:
         if self.playwright:
             await self.playwright.stop()
 
+    async def _goto_with_retry(self, url: str, retries: int = NAVIGATION_RETRIES) -> None:
+        """Navigate with exponential-backoff retries on transient failures."""
+        if not self.page:
+            raise RuntimeError("Scraper has not been started")
+        last_error: Exception | None = None
+        for attempt in range(1, retries + 1):
+            try:
+                await self.page.goto(url, wait_until="domcontentloaded")
+                return
+            except Exception as exc:  # noqa: BLE001 - transient nav errors are retried
+                last_error = exc
+                print(f"[{datetime.now()}] navigation attempt {attempt}/{retries} failed: {exc}")
+                if attempt < retries:
+                    await asyncio.sleep(2**attempt)
+        raise RuntimeError(f"Navigation to {url} failed after {retries} attempts") from last_error
+
     async def search_permits(self, query: str = "building") -> list[dict[str, Any]]:
         if not self.page:
             raise RuntimeError("Scraper has not been started")
 
         print(f"[{datetime.now()}] searching public permits: {query}")
-        await self.page.goto(self.search_url)
+        await self._goto_with_retry(self.search_url)
         await self.page.wait_for_load_state("networkidle")
 
         records_tab = self.page.get_by_role("tab", name="Records")
@@ -78,7 +107,7 @@ class OpenGovPermitScraper:
             raise RuntimeError("Scraper has not been started")
 
         print(f"[{datetime.now()}] fetching details: {permit_url}")
-        await self.page.goto(permit_url)
+        await self._goto_with_retry(permit_url)
         await self.page.wait_for_load_state("networkidle")
         await asyncio.sleep(2)
 
@@ -107,7 +136,11 @@ class OpenGovPermitScraper:
             records: list[dict[str, Any]] = []
             for index, permit in enumerate(permits, 1):
                 print(f"[{index}/{len(permits)}] processing {permit.get('permit_number')}")
-                details = await self.get_permit_details(permit["url"])
+                try:
+                    details = await self.get_permit_details(permit["url"])
+                except Exception as exc:  # noqa: BLE001 - one bad page must not kill the run
+                    print(f"Skipping {permit.get('permit_number')} after detail fetch failed: {exc}")
+                    continue
                 details.update(permit)
                 records.append(details)
                 await asyncio.sleep(2)
@@ -118,22 +151,30 @@ class OpenGovPermitScraper:
     async def _field_text(self, label: str) -> str:
         if not self.page:
             return ""
-        element = self.page.locator(f"text={label}").first
-        if await element.count() == 0:
+        try:
+            element = self.page.locator(f"text={label}").first
+            if await element.count() == 0:
+                return ""
+            parent = element.locator("xpath=..")
+            paragraph = parent.locator("p")
+            if await paragraph.count() == 0:
+                return ""
+            return (await paragraph.first.inner_text()).strip()
+        except Exception as exc:  # noqa: BLE001 - locator/text failures yield no value
+            print(f"Field lookup for {label!r} failed: {exc}")
             return ""
-        parent = element.locator("xpath=..")
-        paragraph = parent.locator("p")
-        if await paragraph.count() == 0:
-            return ""
-        return (await paragraph.first.inner_text()).strip()
 
     async def _text_near_heading(self, selector: str, contains: str) -> str:
         if not self.page:
             return ""
-        element = self.page.locator(selector).filter(has_text=contains).first
-        if await element.count() == 0:
+        try:
+            element = self.page.locator(selector).filter(has_text=contains).first
+            if await element.count() == 0:
+                return ""
+            return (await element.inner_text()).strip()
+        except Exception as exc:  # noqa: BLE001 - locator/text failures yield no value
+            print(f"Heading lookup for {contains!r} failed: {exc}")
             return ""
-        return (await element.inner_text()).strip()
 
 
 def save_json(records: list[dict[str, Any]], path: str) -> None:

@@ -33,8 +33,10 @@ class PermitIntelligencePipeline:
         portal_base_url: str = "https://conroetx.portal.opengov.com",
         min_cost: float = 50000,
         headless: bool = True,
+        city: str = "CONROE",
     ) -> None:
         self.min_cost = min_cost
+        self.city = city
         self.scraper = OpenGovPermitScraper(base_url=portal_base_url, headless=headless)
         self.parcels = PublicParcelClient()
 
@@ -51,7 +53,7 @@ class PermitIntelligencePipeline:
 
     def _enrich(self, permit: dict[str, Any]) -> dict[str, Any]:
         record = permit.copy()
-        address = extract_street_address(record.get("location", ""))
+        address = extract_street_address(record.get("location", ""), city=self.city)
         if address:
             parcel = self.parcels.query_by_address(address)
             if parcel:
@@ -104,9 +106,28 @@ class PermitIntelligencePipeline:
         return record
 
 
-def extract_street_address(location: str) -> str:
-    without_state_zip = re.sub(r",\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?.*$", "", location, flags=re.IGNORECASE)
-    return re.sub(r"\s+CONROE$", "", without_state_zip, flags=re.IGNORECASE).strip()
+def extract_street_address(location: str, city: str = "CONROE") -> str:
+    """Extract the street portion of a permit location string.
+
+    Handles comma-separated "123 MAIN ST, SPRINGFIELD, TX 77301" generically
+    (the city segment is dropped without needing to know the city), and the
+    no-comma form "123 MAIN ST SPRINGFIELD, TX 77301" using the ``city``
+    argument. Pass the portal's city (``PermitIntelligencePipeline(city=...)``
+    or ``--city``) so another city can genuinely be substituted; the default
+    keeps the legacy Conroe behavior.
+    """
+    if not location:
+        return ""
+    text = re.sub(r",\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?.*$", "", location, flags=re.IGNORECASE).strip()
+
+    # Generic path: "street, city" -> keep the street.
+    comma_parts = [part.strip() for part in text.split(",")]
+    if len(comma_parts) >= 2 and re.fullmatch(r"[A-Za-z][A-Za-z .'\-]*", comma_parts[-1]):
+        text = ", ".join(comma_parts[:-1]).strip()
+
+    if city:
+        text = re.sub(rf"[\s,]+{re.escape(city)}$", "", text, flags=re.IGNORECASE).strip()
+    return text
 
 
 def parse_money(value: Any) -> float:
@@ -139,6 +160,7 @@ def write_outputs(
 async def async_main() -> None:
     parser = argparse.ArgumentParser(description="Run public permit intelligence pipeline.")
     parser.add_argument("--portal", default="https://conroetx.portal.opengov.com")
+    parser.add_argument("--city", default="CONROE", help="City stripped from location strings during address extraction")
     parser.add_argument("--max-permits", type=int, default=25)
     parser.add_argument("--min-cost", type=float, default=50000)
     parser.add_argument("--headless", action="store_true")
@@ -149,6 +171,7 @@ async def async_main() -> None:
         portal_base_url=args.portal,
         min_cost=args.min_cost,
         headless=args.headless,
+        city=args.city,
     )
     records = await pipeline.run(max_permits=args.max_permits)
     write_outputs(records, dashboard_path=args.dashboard or None)
