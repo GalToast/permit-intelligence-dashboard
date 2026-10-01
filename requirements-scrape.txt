@@ -1,0 +1,11 @@
+# Optional: live browser scraping only (src/permit_scraper.py).
+#
+# Install with:
+#     pip install -r requirements-scrape.txt
+# Then download the browser once (this is the ~150MB step):
+#     playwright install chromium
+#
+# The dashboard demo, the test suite, and ArcGIS parcel enrichment do NOT
+# need any of this.
+-r requirements.txt
+playwright==1.63.0

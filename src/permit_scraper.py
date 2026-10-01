@@ -1,4 +1,13 @@
-"""OpenGov-style public permit scraper."""
+"""OpenGov-style public permit scraper.
+
+Playwright is an OPTIONAL dependency of this module: it is imported lazily
+inside :meth:`OpenGovPermitScraper.start`, so the rest of the package
+(pipeline scoring, parcel enrichment, dashboard, tests) imports and runs
+without it. Live scraping needs both the package and its browser:
+
+    pip install -r requirements-scrape.txt
+    playwright install chromium
+"""
 
 from __future__ import annotations
 
@@ -6,9 +15,10 @@ import asyncio
 import csv
 import json
 from datetime import datetime
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
-from playwright.async_api import Browser, Page, async_playwright
+if TYPE_CHECKING:  # pragma: no cover - import-time only
+    from playwright.async_api import Browser, Page
 
 NAVIGATION_TIMEOUT_MS = 30_000
 ELEMENT_TIMEOUT_MS = 15_000
@@ -34,6 +44,14 @@ class OpenGovPermitScraper:
         self.playwright = None
 
     async def start(self) -> None:
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError as exc:
+            raise RuntimeError(
+                "Playwright is not installed, but live scraping needs it. Install it with "
+                "'pip install -r requirements-scrape.txt' and download the browser once with "
+                "'playwright install chromium'."
+            ) from exc
         self.playwright = await async_playwright().start()
         self.browser = await self.playwright.chromium.launch(headless=self.headless)
         self.page = await self.browser.new_page()

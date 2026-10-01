@@ -1,3 +1,7 @@
-playwright==1.63.0
+# Core dependencies: the dashboard demo, the test suite, and the public ArcGIS
+# parcel enrichment all run on these alone.
+#
+# Playwright is intentionally NOT listed here. It is only needed for live
+# browser scraping (src/permit_scraper.py); see requirements-scrape.txt for
+# that optional path.
 requests==2.33.1
-jinja2==3.1.6

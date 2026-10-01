@@ -54,8 +54,11 @@ public permit portal
 
 ### Dashboard-only demo (no browser needed)
 
-This path uses only the synthetic sample data. It does **not** require Playwright's
-browser download (`playwright install chromium`), just the Python packages.
+This path uses only the synthetic sample data. It does **not** need Playwright at
+all — `requirements.txt` contains just the HTTP/parsing libraries, so neither
+the Playwright package nor its browser download (`playwright install chromium`)
+is installed. (Playwright lives in the optional `requirements-scrape.txt`, used
+only for the live pipeline below.)
 
 ```bash
 python -m venv .venv
@@ -81,10 +84,11 @@ python -m unittest discover -s tests
 ### Optional: live public-record pipeline
 
 The live pipeline drives a real browser against the public OpenGov portal and
-queries the public ArcGIS enrichment layer. It requires the Chromium download
-and takes longer:
+queries the public ArcGIS enrichment layer. It needs the optional scraping
+dependencies plus the Chromium download (~150MB), and takes longer:
 
 ```bash
+pip install -r requirements-scrape.txt
 playwright install chromium
 python src/pipeline.py --max-permits 10 --min-cost 50000 --headless
 ```
